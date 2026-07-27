@@ -11,27 +11,26 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, json, urllib.request, urllib.error
-          tok=os.environ.get("TOKEN","")
-          H="amplecouture1"; V="v20260301"
+          tok=os.environ.get("TOKEN",""); H="amplecouture1"; V="v20260301"
+          BASE=f"https://{H}.myshopline.com/admin/openapi/{V}"
           def req(method,url,body=None):
               data=json.dumps(body).encode() if body is not None else None
-              r=urllib.request.Request(url,data=data,method=method,headers={
-                  "Content-Type":"application/json","Authorization":"Bearer "+tok})
+              r=urllib.request.Request(url,data=data,method=method,headers={"Content-Type":"application/json","Authorization":"Bearer "+tok})
               try:
-                  resp=urllib.request.urlopen(r,timeout=30); return resp.status, resp.read().decode()[:600]
-              except urllib.error.HTTPError as e: return e.code, e.read().decode()[:600]
+                  resp=urllib.request.urlopen(r,timeout=30); return resp.status, resp.read().decode()
+              except urllib.error.HTTPError as e: return e.code, e.read().decode()
               except Exception as e: return "ERR", str(e)[:250]
-          print("token len",len(tok))
-          tests=[
-           ("REST orders",       "GET",  f"https://{H}.myshopline.com/admin/openapi/{V}/orders.json?limit=1", None),
-           ("REST orders/count", "GET",  f"https://{H}.myshopline.com/admin/openapi/{V}/orders/count.json", None),
-           ("REST customers",    "GET",  f"https://{H}.myshopline.com/admin/openapi/{V}/customers.json?limit=1", None),
-           ("GQL graphql.json",  "POST", f"https://{H}.myshopline.com/admin/openapi/{V}/graphql.json", {"query":"{ __typename }"}),
-           ("GQL graphql",       "POST", f"https://{H}.myshopline.com/admin/openapi/{V}/graphql", {"query":"{ __typename }"}),
-           ("GQL root graphql",  "POST", f"https://{H}.myshopline.com/admin/openapi/graphql.json", {"query":"{ __typename }"}),
-          ]
-          for name,m,url,b in tests:
-              s,body=req(m,url,b)
-              print(f"\n=== {name} [{m}] -> HTTP {s}")
-              print(body)
-          PY
+          s,body=req("GET",BASE+"/orders.json?limit=1")
+          print("orders HTTP",s)
+          cid=None
+          try:
+              o=json.loads(body)["orders"][0]
+              print("ORDER KEYS:", list(o.keys()))
+              print("customer:", json.dumps(o.get("customer"))[:250])
+              print("customer_id:", o.get("customer_id"))
+              print("money:", {k:o.get(k) for k in ["created_at","total_price","financial_status","gateway","payment_gateway_names","processing_method","currency","name"]})
+              li=o.get("line_items",[])
+              print("line_item[0]:", json.dumps(li[0])[:500] if li else "none")
+              c=o.get("customer") or {}
+              cid=(c.get("id") if isinstance(c,dict) else None) or o.get("customer_id")
+          except Exception as e:
