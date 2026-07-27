@@ -34,3 +34,13 @@ jobs:
               c=o.get("customer") or {}
               cid=(c.get("id") if isinstance(c,dict) else None) or o.get("customer_id")
           except Exception as e:
+              print("parse err:", e, "| raw:", body[:400])
+          print("\nExtracted customer id:", cid)
+          if cid:
+              for name,url in [("single customer", f"{BASE}/customers/{cid}.json"),("customer member", f"{BASE}/customers/{cid}/member.json"),("members/id", f"{BASE}/members/{cid}.json")]:
+                  s,b=req("GET",url); print(f"\n=== {name} -> HTTP {s}"); print(b[:500])
+          for name,url in [("customers list", BASE+"/customers.json?limit=1"), ("customers count", BASE+"/customers/count.json")]:
+              s,b=req("GET",url); print(f"\n=== {name} -> HTTP {s}"); print(b[:300])
+          for name,url in [("gql admin/api", f"https://{H}.myshopline.com/admin/api/{V}/graphql.json"),("gql openapi graphql", f"{BASE}/graphql")]:
+              s,b=req("POST",url,{"query":"{ __typename }"}); print(f"\n=== {name} -> HTTP {s}"); print(b[:300])
+          PY
