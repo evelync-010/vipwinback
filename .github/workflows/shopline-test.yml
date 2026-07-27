@@ -19,28 +19,27 @@ jobs:
               try:
                   resp=urllib.request.urlopen(r,timeout=30); return resp.status, resp.read().decode()
               except urllib.error.HTTPError as e: return e.code, e.read().decode()
-              except Exception as e: return "ERR", str(e)[:250]
-          s,body=req("GET",BASE+"/orders.json?limit=1")
-          print("orders HTTP",s)
-          cid=None
+              except Exception as e: return "ERR", str(e)[:200]
+          # customer id from an order
+          s,b=req("GET",BASE+"/orders.json?limit=1"); cid=None
           try:
-              o=json.loads(body)["orders"][0]
-              print("ORDER KEYS:", list(o.keys()))
-              print("customer:", json.dumps(o.get("customer"))[:250])
-              print("customer_id:", o.get("customer_id"))
-              print("money:", {k:o.get(k) for k in ["created_at","total_price","financial_status","gateway","payment_gateway_names","processing_method","currency","name"]})
-              li=o.get("line_items",[])
-              print("line_item[0]:", json.dumps(li[0])[:500] if li else "none")
-              c=o.get("customer") or {}
-              cid=(c.get("id") if isinstance(c,dict) else None) or o.get("customer_id")
-          except Exception as e:
-              print("parse err:", e, "| raw:", body[:400])
-          print("\nExtracted customer id:", cid)
+              o=json.loads(b)["orders"][0]; c=o.get("customer") or {}; cid=c.get("id") or o.get("customer_id")
+          except: pass
+          print("order customer id:", cid)
+          # customers list
+          s,b=req("GET",BASE+"/customers.json?limit=1"); print("\n=== customers list -> HTTP",s); print(b[:1400])
+          try:
+              cu=json.loads(b)["customers"][0]; print("\nCUSTOMER KEYS:", list(cu.keys()))
+              if not cid: cid=cu.get("id")
+          except Exception as e: print("cust parse:",e)
+          # single customer
           if cid:
-              for name,url in [("single customer", f"{BASE}/customers/{cid}.json"),("customer member", f"{BASE}/customers/{cid}/member.json"),("members/id", f"{BASE}/members/{cid}.json")]:
-                  s,b=req("GET",url); print(f"\n=== {name} -> HTTP {s}"); print(b[:500])
-          for name,url in [("customers list", BASE+"/customers.json?limit=1"), ("customers count", BASE+"/customers/count.json")]:
-              s,b=req("GET",url); print(f"\n=== {name} -> HTTP {s}"); print(b[:300])
-          for name,url in [("gql admin/api", f"https://{H}.myshopline.com/admin/api/{V}/graphql.json"),("gql openapi graphql", f"{BASE}/graphql")]:
-              s,b=req("POST",url,{"query":"{ __typename }"}); print(f"\n=== {name} -> HTTP {s}"); print(b[:300])
+              s,b=req("GET",f"{BASE}/customers/{cid}.json"); print(f"\n=== single customer {cid} -> HTTP",s); print(b[:1400])
+          # customer groups (tiers may be groups)
+          for ep in ["customer_groups.json","customers/groups.json"]:
+              s,b=req("GET",f"{BASE}/{ep}"); print(f"\n=== {ep} -> HTTP",s); print(b[:400])
+          # graphql memberInfo (tier)
+          if cid:
+              q={"query":"query{ memberInfo(customerId:\"gid://shopline/Customer/%s\"){ levelName levelCode levelOrder membershipType } }" % cid}
+              s,b=req("POST",f"https://{H}.myshopline.com/admin/api/{V}/graphql.json",q); print("\n=== GQL memberInfo (/admin/api) -> HTTP",s); print(b[:500])
           PY
